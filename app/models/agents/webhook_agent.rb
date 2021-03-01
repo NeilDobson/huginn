@@ -15,7 +15,7 @@ module Agents
 
       #{'The placeholder symbols above will be replaced by their values once the agent is saved.' unless id}
 
-      Options:
+      Modified Options:
 
         * `secret` - A token that the host will provide for authentication.
         * `expected_receive_period_in_days` - How often you expect to receive
@@ -65,6 +65,7 @@ module Agents
       rescue EOFError
       end
 
+      params.each { |k,v| interpolation_context[k.sub(".","_")] = v } 
       method = request.method_symbol.to_s
       headers = request.headers.each_with_object({}) { |(name, value), hash|
         case name
@@ -117,7 +118,7 @@ module Agents
       end
 
       if interpolated['response_headers'].presence
-        [interpolated(params)['response'] || 'Event Created', code, "text/plain", interpolated['response_headers'].presence]
+        [interpolated(params)['response'] || 'Event Created', code, JSON.parse(interpolated['response_headers'])["Content-Type"] || "text/plain", (interpolated['response_headers'].present? ? JSON.parse(interpolated['response_headers']) : nil)]
       else
         [interpolated(params)['response'] || 'Event Created', code]
       end
