@@ -15,7 +15,7 @@ module Agents
 
       #{'The placeholder symbols above will be replaced by their values once the agent is saved.' unless id}
 
-      Modified Options:
+      Options:
 
         * `secret` - A token that the host will provide for authentication.
         * `expected_receive_period_in_days` - How often you expect to receive
@@ -65,7 +65,25 @@ module Agents
       rescue EOFError
       end
 
-      params.each { |k,v| interpolation_context[k.sub(".","_")] = v } 
+      block = -> (hash,key,value) {
+  parts = key.split('.',2)
+  if parts.size == 2
+    if not hash.key?(parts[0])
+      subHash = Hash.new
+      hash[parts[0]] = subHash
+    else
+      subHash = hash[parts[0]]
+    end
+    block.call(subHash, parts[1], value)
+  else
+    hash[key] = value
+  end
+  }
+
+params.keys.each { | k |
+  block.call(interpolation_context, k, params[k]) }
+
+
       method = request.method_symbol.to_s
       headers = request.headers.each_with_object({}) { |(name, value), hash|
         case name

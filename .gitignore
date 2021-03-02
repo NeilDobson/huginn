@@ -30,3 +30,6 @@ db/schema.rb
 .local/
 spec/examples.txt
 files
+env
+env-all
+.swp
