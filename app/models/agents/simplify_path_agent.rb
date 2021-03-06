@@ -57,6 +57,7 @@ module Agents
 	base = 0
 	group = toSnap.shift(80)
 	road = []
+        googleKey = credential("googleMapsAPI")
 	while (group.length() > 0) do
   		path = ""
   		#print("#{group.length()} points\n")
@@ -64,7 +65,7 @@ module Agents
     			path += "#{group[i-1]["lat"]},#{group[i-1]["lng"]}|"
   		end
 		log("Fetching snapped points")
-  		url = URI("https://roads.googleapis.com/v1/snapToRoads?interpolate=true&key=AIzaSyADtJ4D_sOsFp4i6yh0arLKns_9CEwiQ8w&path=#{path[0..-2]}")
+  		url = URI("https://roads.googleapis.com/v1/snapToRoads?interpolate=true&key=#{googleKey}&path=#{path[0..-2]}")
   		reply = Net::HTTP.get(url)
   		points = JSON.parse(reply)
   		points["snappedPoints"].each { |e| if e.include?("originalIndex")
