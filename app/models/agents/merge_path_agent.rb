@@ -5,18 +5,18 @@ module Agents
 
     description do
       <<-MD
-	Process two walk events which match on their date.  The first is stored in memory until the second is available.
+	Process two walk events which match on their id.  The first is stored in memory until the second is available.
 	For each point in the snapped track, output the snapped points if they are within tolerance of the simplified points, otherwise 
 	use the simplified points.
 	Incoming events look like
-	  { "walk" => { "state" => "simplified", "count" => 2, "date" => 161818 =, "points" => [ { "lat" => 1, "lng" => 1 }, { "lat" => 2, "lng" => 2 } ] } }
-	  { "walk" => { "state" => "snapped", "count" => 2, "date" => 161818 =, "points" => [ { "lat" => 1, "lng" => 1 }, { "lat" => 2, "lng" => 2 } ] } }
+	  { "walk" => { "state" => "simplified", "count" => 2, "id" => "1234", "date" => 161818 =, "points" => [ { "lat" => 1, "lng" => 1 }, { "lat" => 2, "lng" => 2 } ] } }
+	  { "walk" => { "state" => "snapped", "count" => 2, "id" => "1234", "date" => 161818 =, "points" => [ { "lat" => 1, "lng" => 1 }, { "lat" => 2, "lng" => 2 } ] } }
       MD
     end
 
     event_description do
       <<-MD
-	  { "walk" => { "state" => "merged", "count" => 2, "date" => 161818 =, "points" => [ { "lat" => 1, "lng" => 1 }, { "lat" => 2, "lng" => 2 } ] } }
+	  { "walk" => { "state" => "merged", "count" => 2, "id" => "1234", "date" => 161818 =, "points" => [ { "lat" => 1, "lng" => 1 }, { "lat" => 2, "lng" => 2 } ] } }
       MD
     end
 
@@ -39,25 +39,25 @@ module Agents
       incoming_events.each { |e| 
         begin
 	  state = e.payload['walk']['state']
-	  date = e.payload['walk']['date']
+	  id = e.payload['walk']['id']
 	  matched = nil
 	  simplified = nil
 	  if (interpolated['pathType1'] == state) 
 	    simplified = e.payload
-	    memory['events'][state][date] = simplified
-	    snapped = memory['events'][interpolated['pathType2']][date]
-	    log("Found simplified for #{date} - snapped is #{snapped != nil}")
+	    memory['events'][state][id] = simplified
+	    snapped = memory['events'][interpolated['pathType2']][id]
+	    log("Found simplified for #{id} - snapped is #{snapped != nil}")
 	  end
 	  if (interpolated['pathType2'] == state) 
 	    snapped = e.payload
-	    memory['events'][state][date] = snapped
-	    simplified = memory['events'][interpolated['pathType1']][date]
-	    log("Found snapped for #{date} - simplified is #{snapped != nil}")
+	    memory['events'][state][id] = snapped
+	    simplified = memory['events'][interpolated['pathType1']][id]
+	    log("Found snapped for #{id} - simplified is #{snapped != nil}")
 	  end
 	  if ((simplified != nil) && (snapped != nil))
 	    log("Merging events")
-	    memory['events'][interpolated['pathType1']].delete(date)
-	    memory['events'][interpolated['pathType2']].delete(date)
+	    memory['events'][interpolated['pathType1']].delete(id)
+	    memory['events'][interpolated['pathType2']].delete(id)
             merged = merge(simplified,snapped)
 	    create_event(payload: merged)
 	    log("Merged simplified and snapped")

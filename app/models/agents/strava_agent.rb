@@ -89,16 +89,26 @@ module Agents
     def fetch_details(id,event_time,token)
        params =  { "keys" => "latlng", "key_by_type" => 'true' }
        log("fetch_details params = #{params}")
-	    con = Faraday.new(url: 'https://www.strava.com', params: params, headers: { 'Authorization' => "Bearer #{token}" })
-	    url = "/api/v3/activities/#{id}/streams"
-	    log("url is #{url}")
-	    res = con.get url
-	    log("response is #{res.body}")
+       con = Faraday.new(url: 'https://www.strava.com', params: params, headers: { 'Authorization' => "Bearer #{token}" })
 	    begin
+	      res = con.get "/api/v3/activities/#{id}/streams"
 	      gpx = JSON.parse(res.body)
+
+	      res = con.get "/api/v3/activities/#{id}"
+	      summary = JSON.parse(res.body)
+
 	      latlng = gpx['latlng']['data'].collect { |each| { "lat" => each[0], "lng" => each[1] } }
 	      log("Creating event")
-	      create_event(payload: { "walk" => { "state" => "raw", "date" => event_time.to_s , "count" => latlng.length, "points" => latlng }})
+	      time = Time.parse(summary["start_date"])
+	      seconds = time.hour * 60 * 60 + time.min * 60 + time.sec
+	      create_event(payload: { "walk" => { "state" => "raw", 
+					          "date" => summary["start_date"], 
+						  "filename" => "#{time.strftime('%Y_%m_%d')}_#{seconds}",
+						  "distance" => summary["distance"],
+						  "elapsed" => summary["elapsed_time"],
+						  "id" => id.to_s,
+						  "count" => latlng.length, 
+						  "points" => latlng }})
 	    rescue => ex
 		    log("Event creation failed - #{ex}")
 	      gpx = {}
