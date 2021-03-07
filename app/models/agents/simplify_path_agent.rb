@@ -19,6 +19,7 @@ module Agents
 
     def default_options
 	    { "tolerance" => 0.0005,
+              "pathType" => "raw",
               "expected_receive_period_in_days" => 3 }
     end
 
@@ -30,81 +31,28 @@ module Agents
     def receive(incoming_events)
 	    incoming_events.each { |e| 
 		    begin
-			    log(e.payload['walk']['count'])
-			    simplified = simplify(e.payload)
-			    create_event(payload: simplified)
-			    log("Created a simplified path")
-			    snapped = snapToRoad(simplified)
-			    create_event(payload: snapped)
+			    if e.payload["walk"]["state"] == interpolated["pathType"]
+			      log(e.payload)
+			      simplified = simplify(e.payload)
+			      create_event(payload: simplified)
+			    end
 	    	rescue => ex
 		  log(ex)
+		  log(ex.backtrace)
+		  raise
 		end
 	    }
     end
 
-    def simplify(payload) 
-	    points = payload['walk']['points']
-	    simplified =  douglasPeucker(points.collect { |e| Point.new(e['lat'], e['lng']) },0.00005,"").collect { |e| { "lat" => e.lat, "lng" => e.lng } }
-	    payload['walk']['points'] = simplified
-	    payload['walk']['count'] = simplified.length
-	    payload['walk']['state'] = "simplified"
-	    return payload
+    def simplify(walk) 
+	    simplified =  douglasPeucker(walk["walk"]["points"].collect { |e| Point.new(e['lat'], e['lng']) },0.00005,"").collect { |e| { "lat" => e.lat, "lng" => e.lng } }
+            result = {}
+            result["walk"] = walk["walk"].dup
+            result['walk']['points'] = simplified
+	    result['walk']['count'] = simplified.length
+	    result['walk']['state'] = "simplified"
+	    return result
     end
-
-    def snapToRoad(payload) 
-	simplified = payload['walk']['points']
-        toSnap = simplified.dup
-	base = 0
-	group = toSnap.shift(80)
-	road = []
-        googleKey = credential("googleMapsAPI")
-	while (group.length() > 0) do
-  		path = ""
-  		#print("#{group.length()} points\n")
-  		for i in 1..(group.length())
-    			path += "#{group[i-1]["lat"]},#{group[i-1]["lng"]}|"
-  		end
-		log("Fetching snapped points")
-  		url = URI("https://roads.googleapis.com/v1/snapToRoads?interpolate=true&key=#{googleKey}&path=#{path[0..-2]}")
-  		reply = Net::HTTP.get(url)
-  		points = JSON.parse(reply)
-  		points["snappedPoints"].each { |e| if e.include?("originalIndex")
-  							e["originalIndex"] = e["originalIndex"] + base
-  						   end}
-  		road += points["snappedPoints"]
-  		base += group.length()
-  		group = toSnap.shift(80)
-	end
-
-	merged = []
-	interpStart = -1
-	for roadIndex in 0 .. (road.length-1) do
-  		roadElem = road[roadIndex]["location"]
-  		if road[roadIndex].include?("originalIndex")
-    			simplifiedElem = simplified[road[roadIndex]["originalIndex"]]
-    			separation = Point.new(roadElem["latitude"],roadElem["longitude"]).separation(Point.new(simplifiedElem["lat"], simplifiedElem["lng"]))
-    			#print("[ #{roadIndex} ] - #{roadElem["latitude"]},#{roadElem["longitude"]} [ #{road[roadIndex]["originalIndex"]} ] -> #{simpli fiedElem["lat"]},#{simplifiedElem["lng"]} = #{separation}")
-    			if (separation < 0.00035)
-      				if interpStart > 0
-        				for extra in interpStart..roadIndex-1 do
-          					merged.push({ "lat": road[extra]["location"]["latitude"], "lng": road[extra]["location"]["longitude"]})
-        				end
-      				end
-      				merged.push({ "lat": road[roadIndex]["location"]["latitude"], "lng": road[roadIndex]["location"]["longitude"]})
-      				interpStart = roadIndex+1
-    			else
-      				merged.push({ "lat": simplified[road[roadIndex]["originalIndex"]]["lat"], "lng": simplified[road[roadIndex]["originalIndex"]]["lng"] })
-      				interpStart = -1
-    			end
-  		end
-	end
-
-    	payload['walk']['points'] = merged
-	payload['walk']['count'] = merged.length
-	payload['walk']['state'] = "merged"
-	return payload
-    end
-
 
   class Point
     def initialize(lat,lng)
